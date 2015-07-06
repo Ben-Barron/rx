@@ -1,26 +1,24 @@
 package com.benbarron.rx.lang;
 
+import com.sun.istack.internal.NotNull;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A thread-safe Collection.
- * @param <T> The type of elements in this collection
+ * @param <E> The type of elements in this collection
  */
-public class ConcurrentCollection<T> extends AbstractCollection<T> {
+public class ConcurrentCollection<E> extends AbstractCollection<E> {
 
-    private final AtomicReference<T[]> arrayReference;
-
-    @SafeVarargs
-    public ConcurrentCollection(T... items) {
-        this.arrayReference = new AtomicReference<>(items);
-    }
+    @SuppressWarnings("unchecked")
+    private final AtomicReference<E[]> arrayReference = new AtomicReference<>((E[]) new Object[0]);
 
     @Override
-    public boolean add(T t) {
+    public boolean add(E e) {
         arrayReference.updateAndGet(prev -> {
-            T[] next = Arrays.copyOf(prev, prev.length + 1);
-            next[prev.length] = t;
+            E[] next = Arrays.copyOf(prev, prev.length + 1);
+            next[prev.length] = e;
             return next;
         });
 
@@ -33,10 +31,10 @@ public class ConcurrentCollection<T> extends AbstractCollection<T> {
     }
 
     @Override
-    public Iterator<T> iterator() {
-        return new Iterator<T>() {
+    public Iterator<E> iterator() {
+        return new Iterator<E>() {
 
-            private final T[] array = arrayReference.get();
+            private final E[] array = arrayReference.get();
 
             private int position = 0;
 
@@ -46,7 +44,7 @@ public class ConcurrentCollection<T> extends AbstractCollection<T> {
             }
 
             @Override
-            public T next() {
+            public E next() {
                 if (hasNext()) {
                     return array[position++];
                 }
@@ -58,7 +56,7 @@ public class ConcurrentCollection<T> extends AbstractCollection<T> {
 
     @Override
     public boolean remove(Object o) {
-        T[] prev, next;
+        E[] prev, next;
 
         do {
             prev = arrayReference.get();

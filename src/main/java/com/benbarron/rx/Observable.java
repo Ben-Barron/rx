@@ -54,31 +54,39 @@ public interface Observable<T> {
         ConcurrentCollection<Observer<T>> observers = new ConcurrentCollection<>();
         AtomicBoolean isConnected = new AtomicBoolean(false);
         AtomicBoolean isStopped = new AtomicBoolean(false);
-        //volatile tomicReference<Closeable> subscription = new AtomicReference<>(null);
 
         return new ConnectableObservable<T>() {
+
+            private volatile Closeable subscription;
+
             @Override
             public Closeable connect() {
                 if (isConnected.compareAndSet(false, true)) {
-                    self.subscribe(new Observer<T>() {
+                    subscription = self.subscribe(new Observer<T>() {
                         @Override
                         public void onComplete() {
-                            observers.forEach(Observer::onComplete);
+                            if (isStopped.compareAndSet(false, true)) {
+                                observers.forEach(Observer::onComplete);
+                            }
                         }
 
                         @Override
                         public void onError(Throwable throwable) {
-                            observers.forEach(observer -> observer.onError(throwable));
+                            if (isStopped.compareAndSet(false, true)) {
+                                observers.forEach(observer -> observer.onError(throwable));
+                            }
                         }
 
                         @Override
                         public void onNext(T item) {
-                            observers.forEach(observer -> observer.onNext(item));
+                            if (!isStopped.get()) {
+                                observers.forEach(observer -> observer.onNext(item));
+                            }
                         }
                     });
                 }
 
-                return null;
+                return subscription;
             }
 
             @Override
@@ -144,13 +152,5 @@ public interface Observable<T> {
 
     static <T> Observable<T> generate(Function<Observer<T>, Closeable> generationFunction) {
         return generationFunction::apply;
-    }
-
-    @SafeVarargs
-    static <T> Observable<T> merge(Observable<T>... observables) {
-        return observer ->
-            Closeable.wrap(Stream.of(observables)
-                .map(observable -> observable.subscribe(observer))
-                .collect(Collectors.toList()));
     }
 }

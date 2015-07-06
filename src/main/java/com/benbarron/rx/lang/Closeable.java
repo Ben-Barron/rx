@@ -21,6 +21,14 @@ public interface Closeable extends AutoCloseable {
     @Override
     void close();
 
+    /**
+     * Closes when CloseableBase.close() is called.
+     * @param closeableManager CloseableManager on which to close with.
+     */
+    default void closeWith(CloseableManager closeableManager) {
+        closeableManager.addCloseable(this);
+    }
+
 
     /**
      * Returns the empty closeable.
