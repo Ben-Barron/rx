@@ -8,15 +8,22 @@ import com.benbarron.rx.lang.ConcurrentCollection;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class Subject<T> implements Observable<T>, Observer<T> {
+public class Subject<T> implements Closeable, Observable<T>, Observer<T> {
 
     private final Collection<Observer<T>> observers = new ConcurrentCollection<>();
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
 
     @Override
+    public void close() {
+        onComplete();
+        observers.clear();
+    }
+
+    @Override
     public void onComplete() {
         if (isStopped.compareAndSet(false, true)) {
             observers.forEach(Observer::onComplete);
+            close();
         }
     }
 
@@ -24,6 +31,7 @@ public class Subject<T> implements Observable<T>, Observer<T> {
     public void onError(Throwable throwable) {
         if (isStopped.compareAndSet(false, true)) {
             observers.forEach(observer -> observer.onError(throwable));
+            close();
         }
     }
 
@@ -36,6 +44,10 @@ public class Subject<T> implements Observable<T>, Observer<T> {
 
     @Override
     public Closeable subscribe(Observer<T> observer) {
+        if (isStopped.get()) {
+            return Closeable.empty();
+        }
+
         observers.add(observer);
         return () -> observers.remove(observer);
     }

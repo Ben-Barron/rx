@@ -1,7 +1,5 @@
 package com.benbarron.rx.lang;
 
-import com.sun.istack.internal.NotNull;
-
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 

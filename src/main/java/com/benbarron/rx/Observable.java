@@ -1,15 +1,11 @@
 package com.benbarron.rx;
 
 import com.benbarron.rx.lang.Closeable;
-import com.benbarron.rx.lang.ConcurrentCollection;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Represents a stream of push-based notifications.
@@ -18,86 +14,34 @@ import java.util.stream.Stream;
 public interface Observable<T> {
 
     default <R> Observable<R> operate(BiConsumer<Observer<R>, T> operation) {
-        return operate(observer -> {
-            AtomicBoolean isStopped = new AtomicBoolean(false);
-            return new Observer<T>() {
+        return operate(o ->
+            new DefaultObserver<T>() {
                 @Override
-                public void onComplete() {
-                    if (isStopped.compareAndSet(false, true)) {
-                        observer.onComplete();
-                    }
+                protected void doOnComplete() {
+                    o.onComplete();
                 }
 
                 @Override
-                public void onError(Throwable throwable) {
-                    if (isStopped.compareAndSet(false, true)) {
-                        observer.onError(throwable);
-                    }
+                protected void doOnError(Throwable throwable) {
+                    o.onError(throwable);
                 }
 
                 @Override
-                public void onNext(T item) {
-                    if (!isStopped.get()) {
-                        operation.accept(observer, item);
-                    }
+                protected void doOnNext(T item) {
+                    operation.accept(o, item);
                 }
-            };
-        });
+            });
     }
 
     default <R> Observable<R> operate(Function<Observer<R>, Observer<T>> operation) {
         return observer -> this.subscribe(operation.apply(observer));
     }
 
-    default ConnectableObservable<T> publish() {
-        Observable<T> self = this;
-        ConcurrentCollection<Observer<T>> observers = new ConcurrentCollection<>();
-        AtomicBoolean isConnected = new AtomicBoolean(false);
-        AtomicBoolean isStopped = new AtomicBoolean(false);
-
-        return new ConnectableObservable<T>() {
-
-            private volatile Closeable subscription;
-
-            @Override
-            public Closeable connect() {
-                if (isConnected.compareAndSet(false, true)) {
-                    subscription = self.subscribe(new Observer<T>() {
-                        @Override
-                        public void onComplete() {
-                            if (isStopped.compareAndSet(false, true)) {
-                                observers.forEach(Observer::onComplete);
-                            }
-                        }
-
-                        @Override
-                        public void onError(Throwable throwable) {
-                            if (isStopped.compareAndSet(false, true)) {
-                                observers.forEach(observer -> observer.onError(throwable));
-                            }
-                        }
-
-                        @Override
-                        public void onNext(T item) {
-                            if (!isStopped.get()) {
-                                observers.forEach(observer -> observer.onNext(item));
-                            }
-                        }
-                    });
-                }
-
-                return subscription;
-            }
-
-            @Override
-            public Closeable subscribe(Observer<T> observer) {
-                observers.add(observer);
-                return () -> observers.remove(observer);
-            }
-        };
-    }
-
     Closeable subscribe(Observer<T> observer);
+
+    default Closeable subscribe() {
+        return subscribe(i -> { });
+    }
 
     default Closeable subscribe(Consumer<T> onNext) {
         return subscribe(onNext, () -> { });
@@ -106,46 +50,39 @@ public interface Observable<T> {
     default Closeable subscribe(Consumer<T> onNext,
                                 Runnable onComplete) {
 
-        return subscribe(onNext, throwable -> { }, onComplete);
+        return subscribe(onNext, t -> { }, onComplete);
     }
 
     default Closeable subscribe(Consumer<T> onNext,
                                 Consumer<Throwable> onError,
                                 Runnable onComplete) {
 
-        AtomicBoolean isStopped = new AtomicBoolean(false);
-        return subscribe(new Observer<T>() {
+        return subscribe(new DefaultObserver<T>() {
             @Override
-            public void onComplete() {
-                if (isStopped.compareAndSet(false, true)) {
-                    onComplete.run();
-                }
+            protected void doOnComplete() {
+                onComplete.run();
             }
 
             @Override
-            public void onError(Throwable throwable) {
-                if (isStopped.compareAndSet(false, true)) {
-                    onError.accept(throwable);
-                }
+            protected void doOnError(Throwable throwable) {
+                onError.accept(throwable);
             }
 
             @Override
-            public void onNext(T item) {
-                if (!isStopped.get()) {
-                    onNext.accept(item);
-                }
+            protected void doOnNext(T item) {
+                onNext.accept(item);
             }
         });
     }
 
     default Observable<T> subscriptionOperate(BiFunction<Observable<T>, Observer<T>, Closeable> subscribeOperation) {
-        return observer -> subscribeOperation.apply(this, observer);
+        return o -> subscribeOperation.apply(this, o);
     }
 
 
     static <T> Observable<T> generate(Consumer<Observer<T>> generationFunction) {
-        return generate(observer -> {
-            generationFunction.accept(observer);
+        return generate(o -> {
+            generationFunction.accept(o);
             return Closeable.empty();
         });
     }
