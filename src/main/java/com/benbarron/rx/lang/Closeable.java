@@ -88,10 +88,15 @@ public interface Closeable extends AutoCloseable {
      * @return A closeable that closes the underlying closeables.
      */
     static Closeable wrap(Iterable<Closeable> closeables) {
-        AtomicBoolean isClosed = new AtomicBoolean(false);
-        return () -> {
-            if (isClosed.compareAndSet(false, true)) {
-                closeAll(closeables);
+        return new Closeable() {
+
+            private final AtomicBoolean isClosed = new AtomicBoolean(false);
+
+            @Override
+            public void close() {
+                if (isClosed.compareAndSet(false, true)) {
+                    closeAll(closeables);
+                }
             }
         };
     }

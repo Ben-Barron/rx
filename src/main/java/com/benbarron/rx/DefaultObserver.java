@@ -19,6 +19,7 @@ abstract class DefaultObserver<T> implements CloseableObserver<T> {
     public void onComplete() {
         if (isStopped.compareAndSet(false, true)) {
             doOnComplete();
+            close();
         }
     }
 
@@ -26,6 +27,7 @@ abstract class DefaultObserver<T> implements CloseableObserver<T> {
     public void onError(Throwable throwable) {
         if (isStopped.compareAndSet(false, true)) {
             doOnError(throwable);
+            close();
         }
     }
 

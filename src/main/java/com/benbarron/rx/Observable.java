@@ -1,7 +1,9 @@
 package com.benbarron.rx;
 
 import com.benbarron.rx.lang.Closeable;
+import com.benbarron.rx.lang.ConcurrentCollection;
 
+import java.util.Collection;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -14,8 +16,7 @@ import java.util.function.Function;
 public interface Observable<T> {
 
     default <R> Observable<R> operate(BiConsumer<Observer<R>, T> operation) {
-        return operate(o ->
-            new DefaultObserver<T>() {
+        return operate(o -> new DefaultObserver<T>() {
                 @Override
                 protected void doOnComplete() {
                     o.onComplete();
@@ -37,6 +38,57 @@ public interface Observable<T> {
         return o -> {
             CloseableObserver<T> observer = operation.apply(o);
             return Closeable.wrap(this.subscribe(observer), observer);
+        };
+    }
+
+    default ConnectableObservable<T> publish() {
+        Observable<T> self = this;
+        return new ConnectableObservable<T>() {
+
+            private final Observable<T> observable = self;
+            private final Collection<Observer<T>> observers = new ConcurrentCollection<>();
+
+            private volatile Closeable subscription;
+
+            @Override
+            public Closeable connect() {
+                if (subscription == null) {
+                    synchronized (observers) {
+                        if (subscription == null) {
+                            CloseableObserver<T> observer = new DefaultObserver<T>() {
+                                @Override
+                                public void close() {
+                                    observers.clear();
+                                }
+
+                                @Override
+                                protected void doOnComplete() {
+                                    observers.forEach(Observer::onComplete);
+                                }
+
+                                @Override
+                                protected void doOnError(Throwable throwable) {
+                                    observers.forEach(o -> o.onError(throwable));
+                                }
+
+                                @Override
+                                protected void doOnNext(T item) {
+                                    observers.forEach(o -> o.onNext(item));
+                                }
+                            };
+                            subscription = Closeable.wrap(observable.subscribe(observer), observer);
+                        }
+                    }
+                }
+
+                return subscription;
+            }
+
+            @Override
+            public Closeable subscribe(Observer<T> observer) {
+                observers.add(observer);
+                return () -> observers.remove(observer);
+            }
         };
     }
 
