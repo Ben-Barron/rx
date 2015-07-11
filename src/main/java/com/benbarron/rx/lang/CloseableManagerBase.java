@@ -1,6 +1,6 @@
 package com.benbarron.rx.lang;
 
-public abstract class CloseableBase implements CloseableManager {
+public abstract class CloseableManagerBase implements CloseableManager {
 
     private final ConcurrentCollection<Closeable> closeables = new ConcurrentCollection<>();
 

@@ -33,8 +33,11 @@ public interface Observable<T> {
             });
     }
 
-    default <R> Observable<R> operate(Function<Observer<R>, Observer<T>> operation) {
-        return observer -> this.subscribe(operation.apply(observer));
+    default <R> Observable<R> operate(Function<Observer<R>, CloseableObserver<T>> operation) {
+        return o -> {
+            CloseableObserver<T> observer = operation.apply(o);
+            return Closeable.wrap(this.subscribe(observer), observer);
+        };
     }
 
     Closeable subscribe(Observer<T> observer);

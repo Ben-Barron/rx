@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Provides a mechanism for releasing resources.
  */
+@FunctionalInterface
 public interface Closeable extends AutoCloseable {
 
     /**
@@ -22,7 +23,7 @@ public interface Closeable extends AutoCloseable {
     void close();
 
     /**
-     * Closes when CloseableBase.close() is called.
+     * Closes when CloseableManagerBase.close() is called.
      * @param closeableManager CloseableManager on which to close with.
      */
     default Closeable closeWith(CloseableManager closeableManager) {
@@ -70,6 +71,15 @@ public interface Closeable extends AutoCloseable {
         exceptions.forEach(exception::addSuppressed);
 
         throw exception;
+    }
+
+    /**
+     * Returns a closeable which closes all underlying closeables.
+     * @param closeables Array of underlying closeables.
+     * @return A closeable that closes the underlying closeables.
+     */
+    static Closeable wrap(Closeable... closeables) {
+        return wrap(Arrays.asList(closeables));
     }
 
     /**

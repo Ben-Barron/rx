@@ -2,7 +2,7 @@ package com.benbarron.rx;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-abstract class DefaultObserver<T> implements Observer<T> {
+abstract class DefaultObserver<T> implements CloseableObserver<T> {
 
     private final AtomicBoolean isStopped = new AtomicBoolean(false);
 
@@ -11,6 +11,9 @@ abstract class DefaultObserver<T> implements Observer<T> {
     protected abstract void doOnError(Throwable throwable);
 
     protected abstract void doOnNext(T item);
+
+    @Override
+    public void close() { }
 
     @Override
     public void onComplete() {
