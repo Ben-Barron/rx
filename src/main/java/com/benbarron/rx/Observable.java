@@ -57,11 +57,6 @@ public interface Observable<T> {
                         if (subscription == null) {
                             CloseableObserver<T> observer = new DefaultObserver<T>() {
                                 @Override
-                                public void close() {
-                                    observers.clear();
-                                }
-
-                                @Override
                                 protected void doOnComplete() {
                                     observers.forEach(Observer::onComplete);
                                 }
@@ -76,7 +71,7 @@ public interface Observable<T> {
                                     observers.forEach(o -> o.onNext(item));
                                 }
                             };
-                            subscription = Closeable.wrap(observable.subscribe(observer), observer);
+                            subscription = Closeable.wrap(observable.subscribe(observer), () -> subscription = null);
                         }
                     }
                 }
